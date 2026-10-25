@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>绳子画椭圆</title>
+<style>
+:root{--bg:#E9EFEC;--panel:#F7FAF8;--ink:#17233B;--muted:#4D5B66;--grid:#D3E0DA;--grid2:#B7CAC2;--trace:#1F4FD8;--string:#2A2A2A;--pin:#B8860B;--pencil:#E3A91B;--accent:#1F4FD8;--line:#C2D1CA;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0F1A1E;--panel:#16252B;--ink:#E4EEF0;--muted:#9DB0B6;--grid:#1F343B;--grid2:#2E4A53;--trace:#7FA6FF;--string:#E8E8E8;--pin:#E8B94A;--pencil:#F0BE3A;--accent:#7FA6FF;--line:#2B434B;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0F1A1E;--panel:#16252B;--ink:#E4EEF0;--muted:#9DB0B6;--grid:#1F343B;--grid2:#2E4A53;--trace:#7FA6FF;--string:#E8E8E8;--pin:#E8B94A;--pencil:#F0BE3A;--accent:#7FA6FF;--line:#2B434B;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"PingFang SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;line-height:1.7}
+main{max-width:920px;margin:0 auto;padding:20px 16px 48px}
+h1{font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif;font-size:clamp(28px,5vw,40px);margin:0 0 4px;font-weight:700;letter-spacing:.04em}
+h2{font-family:"Noto Serif SC","Source Han Serif SC","Songti SC","SimSun",serif;font-size:22px;margin:28px 0 8px}
+.sub{color:var(--muted);margin:0 0 16px}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+canvas{display:block;width:100%;aspect-ratio:8/5;touch-action:none;border-radius:6px}
+.controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:14px 0}
+button{font:inherit;padding:6px 18px;border:1px solid var(--ink);background:transparent;color:var(--ink);border-radius:6px;cursor:pointer;min-height:42px}
+button:hover{background:var(--ink);color:var(--bg)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+label.len{display:flex;align-items:center;gap:10px;flex:1;min-width:230px}
+input[type=range]{flex:1;accent-color:var(--accent);min-height:30px}
+.readout{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0}
+.readout div{border-left:3px solid var(--line);padding:2px 10px}
+.readout .sum{border-left-color:var(--accent)}
+.readout b{display:block;font-size:clamp(20px,4vw,26px);font-variant-numeric:tabular-nums;font-weight:600}
+.readout span{color:var(--muted);font-size:14px}
+.note{max-width:62ch}
+.note p{margin:0 0 12px}
+@media (max-width:520px){.readout span{font-size:12px}}
+</style>
+</head>
+<body>
+<main>
+<h1>绳子画椭圆</h1>
+<p class="sub">绳长不变，笔尖拉紧绳子绕一圈，画出的轨迹是椭圆。拖动钉子 F₁、F₂ 或笔尖试试。</p>
+<div class="board"><canvas id="cv" aria-label="用细绳和两个钉子画椭圆的演示图"></canvas></div>
+<div class="controls">
+<button id="play" type="button">暂停</button>
+<button id="clear" type="button">清除轨迹</button>
+<label class="len">绳长<input id="len" type="range" min="100" max="720" step="1" value="560"></label>
+</div>
+<div class="readout" aria-live="off">
+<div><b id="r1">0</b><span>|PF₁|（格）</span></div>
+<div><b id="r2">0</b><span>|PF₂|（格）</span></div>
+<div class="sum"><b id="rs">0</b><span>两者之和，始终等于绳长</span></div>
+</div>
+<section class="note">
+<h2>为什么是椭圆</h2>
+<p>绳子拉紧时被笔尖 P 分成 PF₁ 和 PF₂ 两段，长度之和始终等于绳长：|PF₁| + |PF₂| = 绳长（定值）。到两个定点的距离之和为定值的点的轨迹就是椭圆，F₁、F₂ 是它的焦点。</p>
+<p>设绳长为 2a，两钉子相距 2c，取 F₁F₂ 所在直线为 x 轴、中点为原点，椭圆方程是 x²/a² + y²/b² = 1，其中 b² = a² − c²。</p>
+<p>绳长必须大于 |F₁F₂|。等于时笔尖只能在线段 F₁F₂ 上，小于时绳子够不到，画不出轨迹。两钉子重合（c = 0）时，轨迹是圆。</p>
+</section>
+</main>
+<script>
+(function(){
+var W=800,H=500,GRID=40;
+var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+var slider=document.getElementById('len'),playBtn=document.getElementById('play'),clearBtn=document.getElementById('clear');
+var r1=document.getElementById('r1'),r2=document.getElementById('r2'),rs=document.getElementById('rs');
+var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+var F1={x:280,y:250},F2={x:520,y:250},L=560,theta=0,playing=!reduce,trail=[],swept=0,drag=null,wasPlaying=false,dirty=true,lastT=0,scale=1,C={};
+var SPEED=1.0;
+
+function refreshColors(){
+  var cs=getComputedStyle(document.documentElement);
+  ['--panel','--ink','--grid','--grid2','--trace','--string','--pin','--pencil','--muted'].forEach(function(n){C[n]=cs.getPropertyValue(n).trim();});
+  dirty=true;
+}
+function geom(){
+  var dx=F2.x-F1.x,dy=F2.y-F1.y,d=Math.hypot(dx,dy),a=L/2,c=d/2;
+  return {d:d,a:a,b:Math.sqrt(Math.max(a*a-c*c,0)),phi:Math.atan2(dy,dx),mx:(F1.x+F2.x)/2,my:(F1.y+F2.y)/2};
+}
+function pt(th){
+  var g=geom(),x=g.a*Math.cos(th),y=g.b*Math.sin(th),cp=Math.cos(g.phi),sp=Math.sin(g.phi);
+  return {x:g.mx+x*cp-y*sp,y:g.my+x*sp+y*cp};
+}
+function addPoint(p){
+  var l=trail[trail.length-1];
+  if(!l||Math.hypot(p.x-l.x,p.y-l.y)>1.2){trail.push(p);if(trail.length>8000)trail.shift();}
+}
+function resetTrail(){
+  trail=[];swept=0;
+  if(reduce){for(var i=0;i<=360;i++)addPoint(pt(i/360*2*Math.PI));}
+  dirty=true;
+}
+function syncSlider(){
+  var d=geom().d;
+  slider.min=Math.ceil(d+10);
+  if(L<d+10)L=d+10;
+  slider.value=L;
+}
+function resize(){
+  var cw=cv.clientWidth||W,dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(cw*dpr);cv.height=Math.round(cw*dpr*H/W);
+  scale=cw*dpr/W;dirty=true;
+}
+function label(t,x,y){ctx.fillStyle=C['--ink'];ctx.font='bold 17px "PingFang SC","Noto Sans SC",sans-serif';ctx.textAlign='center';ctx.fillText(t,x,y);}
+function draw(){
+  ctx.setTransform(scale,0,0,scale,0,0);
+  ctx.fillStyle=C['--panel'];ctx.fillRect(0,0,W,H);
+  var i;
+  for(i=0;i<=W/GRID;i++){ctx.strokeStyle=(i%5===0)?C['--grid2']:C['--grid'];ctx.lineWidth=(i%5===0)?1.2:1;ctx.beginPath();ctx.moveTo(i*GRID,0);ctx.lineTo(i*GRID,H);ctx.stroke();}
+  for(i=0;i<=H/GRID;i++){ctx.strokeStyle=(i%5===0)?C['--grid2']:C['--grid'];ctx.lineWidth=(i%5===0)?1.2:1;ctx.beginPath();ctx.moveTo(0,i*GRID);ctx.lineTo(W,i*GRID);ctx.stroke();}
+  if(trail.length>1){
+    ctx.strokeStyle=C['--trace'];ctx.lineWidth=2.6;ctx.lineJoin='round';ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(trail[0].x,trail[0].y);
+    for(i=1;i<trail.length;i++)ctx.lineTo(trail[i].x,trail[i].y);
+    ctx.stroke();
+  }
+  var P=pt(theta);
+  ctx.strokeStyle=C['--string'];ctx.lineWidth=1.6;
+  ctx.beginPath();ctx.moveTo(F1.x,F1.y);ctx.lineTo(P.x,P.y);ctx.lineTo(F2.x,F2.y);ctx.stroke();
+  [F1,F2].forEach(function(f,k){
+    ctx.fillStyle=C['--pin'];ctx.strokeStyle=C['--ink'];ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(f.x,f.y,8,0,2*Math.PI);ctx.fill();ctx.stroke();
+  });
+  var sep=F1.x<=F2.x?1:-1;
+  label('F₁',F1.x-sep*(Math.abs(F1.x-F2.x)<30?0:22),F1.y+(Math.abs(F1.x-F2.x)<30?-18:6));
+  label('F₂',F2.x+sep*(Math.abs(F1.x-F2.x)<30?0:22),F2.y+6);
+  ctx.save();ctx.translate(P.x,P.y);ctx.rotate(0.45);
+  ctx.fillStyle=C['--pencil'];ctx.fillRect(-4.5,-52,9,39);
+  ctx.fillStyle='#D46A6A';ctx.fillRect(-4.5,-58,9,6);
+  ctx.fillStyle='#E8CFA0';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-4.5,-13);ctx.lineTo(4.5,-13);ctx.closePath();ctx.fill();
+  ctx.fillStyle=C['--ink'];ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-1.8,-5);ctx.lineTo(1.8,-5);ctx.closePath();ctx.fill();
+  ctx.restore();
+  var d1=Math.hypot(P.x-F1.x,P.y-F1.y)/GRID,d2=Math.hypot(P.x-F2.x,P.y-F2.y)/GRID;
+  r1.textContent=d1.toFixed(2);r2.textContent=d2.toFixed(2);rs.textContent=(d1+d2).toFixed(2);
+}
+function frame(t){
+  var dt=Math.min((t-lastT)/1000,0.05);lastT=t;
+  if(playing&&!drag){
+    theta+=SPEED*dt;
+    if(swept<2*Math.PI+0.1){swept+=SPEED*dt;addPoint(pt(theta));}
+    dirty=true;
+  }
+  if(dirty){dirty=false;draw();}
+  requestAnimationFrame(frame);
+}
+function toWorld(e){
+  var r=cv.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H};
+}
+function hit(q){
+  var P=pt(theta),c=[['P',P,26],['F1',F1,20],['F2',F2,20]],best=null,bd=1e9;
+  c.forEach(function(k){var dd=Math.hypot(q.x-k[1].x,q.y-k[1].y);if(dd<k[2]&&dd<bd){bd=dd;best=k[0];}});
+  return best;
+}
+cv.addEventListener('pointerdown',function(e){
+  var h=hit(toWorld(e));
+  if(!h)return;
+  drag=h;wasPlaying=playing;playing=false;
+  cv.setPointerCapture(e.pointerId);e.preventDefault();
+});
+cv.addEventListener('pointermove',function(e){
+  var q=toWorld(e);
+  if(!drag){cv.style.cursor=hit(q)?'grab':'default';return;}
+  cv.style.cursor='grabbing';
+  if(drag==='P'){
+    var g=geom(),dx=q.x-g.mx,dy=q.y-g.my,cp=Math.cos(g.phi),sp=Math.sin(g.phi);
+    var lx=dx*cp+dy*sp,ly=-dx*sp+dy*cp;
+    theta=Math.atan2(g.b>0.01?ly/g.b:0,lx/g.a);
+    addPoint(pt(theta));
+  }else{
+    var f=drag==='F1'?F1:F2,o=drag==='F1'?F2:F1;
+    var nx=Math.min(W-24,Math.max(24,q.x)),ny=Math.min(H-24,Math.max(24,q.y));
+    if(Math.hypot(nx-o.x,ny-o.y)+10<=L){f.x=nx;f.y=ny;syncSlider();resetTrail();}
+  }
+  dirty=true;
+});
+function endDrag(){if(!drag)return;drag=null;playing=wasPlaying;playBtn.textContent=playing?'暂停':'播放';cv.style.cursor='default';dirty=true;}
+cv.addEventListener('pointerup',endDrag);
+cv.addEventListener('pointercancel',endDrag);
+slider.addEventListener('input',function(){L=+slider.value;resetTrail();});
+playBtn.addEventListener('click',function(){playing=!playing;playBtn.textContent=playing?'暂停':'播放';dirty=true;});
+clearBtn.addEventListener('click',function(){trail=[];swept=0;dirty=true;});
+playBtn.textContent=playing?'暂停':'播放';
+if(window.ResizeObserver)new ResizeObserver(resize).observe(cv);else window.addEventListener('resize',resize);
+if(window.matchMedia)matchMedia('(prefers-color-scheme: dark)').addEventListener('change',refreshColors);
+new MutationObserver(refreshColors).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','class']});
+refreshColors();syncSlider();resetTrail();resize();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
