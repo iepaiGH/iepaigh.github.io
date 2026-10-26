@@ -13,6 +13,10 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 .status{margin:14px 0 0;padding:10px 12px;border-left:4px solid var(--accent);background:var(--panel);border-radius:0 6px 6px 0;font-variant-numeric:tabular-nums}
 .status.bad{border-left-color:var(--warn);color:var(--warn)}
 .qa{list-style:none;margin:0;padding:0}
+.qnav{display:flex;align-items:center;gap:12px;margin:0 0 4px}
+.qnav span{font-variant-numeric:tabular-nums;color:var(--muted)}
+button:disabled{opacity:.4;cursor:default}
+button:disabled:hover{background:transparent;color:var(--ink)}
 .qa>li{border-top:1px solid var(--line);padding:14px 0}
 .qa h3{font-size:17px;margin:0 0 6px}
 .qa p{margin:0 0 10px}
@@ -57,11 +61,8 @@ input[type=range]{flex:1;accent-color:var(--accent);min-height:30px}
 </div>
 <p class="status" id="status"></p>
 <section class="note">
-<h2>为什么是椭圆</h2>
-<p>绳子拉紧时被笔尖 P 分成 PF₁ 和 PF₂ 两段，长度之和始终等于绳长：|PF₁| + |PF₂| = 绳长（定值）。到两个定点的距离之和为定值的点的轨迹就是椭圆，F₁、F₂ 是它的焦点。</p>
-<p>设绳长为 2a，两钉子相距 2c，取 F₁F₂ 所在直线为 x 轴、中点为原点，椭圆方程是 x²/a² + y²/b² = 1，其中 b² = a² − c²。</p>
-<p>两钉子重合（c = 0）时，轨迹是圆。</p>
 <h2>追问</h2>
+<div class="qnav"><button type="button" id="qprev">上一个</button><span id="qcount">1 / 4</span><button type="button" id="qnext">下一个</button></div>
 <ul class="qa">
 <li><h3>追问 1：移动的笔尖（动点）满足的几何条件是什么？</h3><p>笔尖到两定点 F₁、F₂ 的距离之和为绳长（定长）：|PF₁| + |PF₂| = 绳长。</p><button type="button" data-q="1">演示</button></li>
 <li><h3>追问 2：动点到两定点的距离之和与两定点间距离 |F₁F₂| 的大小关系变化时，轨迹会怎样变化？</h3><ul><li>和 &gt; |F₁F₂|：轨迹是椭圆。和越接近 |F₁F₂|，椭圆越扁；和越大，椭圆越接近圆。</li><li>和 = |F₁F₂|：轨迹是线段 F₁F₂。</li><li>和 &lt; |F₁F₂|：没有轨迹。</li></ul><button type="button" data-q="2">演示：绳长由长变短</button></li>
@@ -197,6 +198,11 @@ slider.addEventListener('input',function(){sweeping=false;L=+slider.value;var d=
 playBtn.addEventListener('click',function(){playing=!playing;playBtn.textContent=playing?'暂停':'播放';dirty=true;});
 clearBtn.addEventListener('click',function(){trail=[];swept=0;dirty=true;});
 playBtn.textContent=playing?'暂停':'播放';
+var qs=document.querySelectorAll('.qa>li'),qi=0,qprev=document.getElementById('qprev'),qnext=document.getElementById('qnext'),qcount=document.getElementById('qcount');
+function showQ(i){qi=Math.max(0,Math.min(qs.length-1,i));qs.forEach(function(li,k){li.hidden=k!==qi;});qcount.textContent=(qi+1)+' / '+qs.length;qprev.disabled=qi===0;qnext.disabled=qi===qs.length-1;}
+qprev.addEventListener('click',function(){showQ(qi-1);});
+qnext.addEventListener('click',function(){showQ(qi+1);});
+showQ(0);
 function resetFoci(){F1.x=280;F1.y=250;F2.x=520;F2.y=250;}
 function runDemo(q){
   sweeping=false;playing=true;playBtn.textContent='暂停';
