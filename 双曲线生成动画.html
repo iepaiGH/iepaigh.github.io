@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>双曲线生成动画</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#222;--mut:#777;--card:#fff;--line:#ddd;--c1:#2a6fdb;--c2:#d9534f;--c3:#2e9e6b;--c4:#e0901a;--tr:#8e44ad;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17181b;--fg:#e8e8e8;--mut:#9a9a9a;--card:#202226;--line:#34363b;--c1:#6ea2ff;--c2:#ff7b72;--c3:#4cd08f;--c4:#f0b04a;--tr:#c58bff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17181b;--fg:#e8e8e8;--mut:#9a9a9a;--card:#202226;--line:#34363b;--c1:#6ea2ff;--c2:#ff7b72;--c3:#4cd08f;--c4:#f0b04a;--tr:#c58bff;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:4px 0}
+p.s{color:var(--mut);margin:0 0 12px;font-size:13px}
+.stage{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+canvas{display:block;width:100%;height:auto;aspect-ratio:16/10}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;margin:12px 0}
+.ctl label{display:flex;flex-direction:column;font-size:13px;color:var(--mut)}
+.ctl b{color:var(--fg);font-weight:600}
+input[type=range]{width:100%}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+button{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:7px 14px;font-size:14px;cursor:pointer}
+button.p{background:var(--c1);border-color:var(--c1);color:#fff}
+.info{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;font-size:14px}
+.info .r{display:flex;flex-wrap:wrap;gap:6px 22px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.note{color:var(--mut);font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>双曲线的生成：圆 + 垂直平分线</h1>
+<p class="s">A 在以 F₁ 为圆心、半径 2a 的圆上运动；AF₂ 的垂直平分线与直线 F₁A 交于 P，P 的轨迹即双曲线。</p>
+<div class="stage"><canvas id="cv" width="1280" height="800"></canvas></div>
+<div class="ctl">
+<label>a = <b id="av">3.0</b><input id="a" type="range" min="1" max="6" step="0.1" value="3"></label>
+<label>c = <b id="cv2">5.0</b><input id="c" type="range" min="2" max="9" step="0.1" value="5"></label>
+<label>速度 <b id="sv">1.0</b><input id="sp" type="range" min="0.2" max="4" step="0.1" value="1"></label>
+<label>角度 t = <b id="tv">0°</b><input id="t" type="range" min="0" max="360" step="0.5" value="0"></label>
+</div>
+<div class="btns">
+<button class="p" id="play">暂停</button>
+<button id="clr">清除轨迹</button>
+<button id="ref">显示标准双曲线</button>
+<button id="asy">显示渐近线</button>
+<button id="aux">显示辅助线</button>
+</div>
+<div class="info">
+<div class="r">
+<span><i class="dot" style="background:var(--c3)"></i>|PF₁| = <b id="d1">–</b></span>
+<span><i class="dot" style="background:var(--c4)"></i>|PF₂| = <b id="d2">–</b></span>
+<span>||PF₁| − |PF₂|| = <b id="df">–</b></span>
+<span>2a = <b id="d2a">–</b></span>
+</div>
+<div class="note" id="eq"></div>
+</div>
+</div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let a=3,c=5,t=0,speed=1,playing=true,showRef=false,showAsy=false,showAux=false;
+let trace=[[],[]];
+const W=cv.width,H=cv.height,S=W/26,ox=W/2,oy=H/2;
+const X=x=>ox+x*S,Y=y=>oy-y*S;
+let K=1;const col=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function compute(){
+  const F1=[-c,0],F2=[c,0],r=2*a,th=t*Math.PI/180;
+  const u=[Math.cos(th),Math.sin(th)];
+  const A=[F1[0]+r*u[0],F1[1]+r*u[1]];
+  const M=[(A[0]+F2[0])/2,(A[1]+F2[1])/2];
+  const d=[F2[0]-A[0],F2[1]-A[1]];
+  const den=u[0]*d[0]+u[1]*d[1];
+  let P=null;
+  if(Math.abs(den)>1e-3){
+    const s=((M[0]-F1[0])*d[0]+(M[1]-F1[1])*d[1])/den;
+    P=[F1[0]+s*u[0],F1[1]+s*u[1]];
+  }
+  return{F1,F2,A,M,d,u,P};
+}
+function addTrace(P){
+  if(!P||Math.abs(P[0])>14||Math.abs(P[1])>10)return;
+  const br=P[0]>=0?1:0, tr=trace[br], last=tr[tr.length-1];
+  if(last&&Math.hypot(P[0]-last[0],P[1]-last[1])>2.5){tr.push(null)}
+  tr.push(P);
+}
+function line(p,q,color,w,dash){
+  ctx.beginPath();ctx.setLineDash(dash||[]);ctx.strokeStyle=color;ctx.lineWidth=2*K;
+  ctx.moveTo(X(p[0]),Y(p[1]));ctx.lineTo(X(q[0]),Y(q[1]));ctx.stroke();ctx.setLineDash([]);
+}
+function pt(p,color,label,dx,dy){
+  ctx.beginPath();ctx.fillStyle=color;ctx.arc(X(p[0]),Y(p[1]),6,0,7);ctx.fill();
+  ctx.font='bold '+(24*K)+'px system-ui,sans-serif';ctx.fillText(label,X(p[0])+(dx||9),Y(p[1])+(dy||-9));
+}
+function draw(){
+  const fg=col('--fg'),mut=col('--mut'),line_=col('--line');
+  K=cv.width/cv.clientWidth;
+  const {F1,F2,A,M,d,u,P}=compute();
+  ctx.clearRect(0,0,W,H);
+  // grid
+  ctx.lineWidth=2*K;ctx.strokeStyle=line_;ctx.globalAlpha=.5;
+  for(let i=-13;i<=13;i++){ctx.beginPath();ctx.moveTo(X(i),0);ctx.lineTo(X(i),H);ctx.stroke()}
+  for(let j=-8;j<=8;j++){ctx.beginPath();ctx.moveTo(0,Y(j));ctx.lineTo(W,Y(j));ctx.stroke()}
+  ctx.globalAlpha=1;
+  line([-13,0],[13,0],mut,1.5);line([0,-8],[0,8],mut,1.5);
+  // reference hyperbola & asymptotes
+  const b=Math.sqrt(c*c-a*a);
+  if(showAsy){
+    line([-13,-13*b/a],[13,13*b/a],mut,1.5,[8,6]);
+    line([-13,13*b/a],[13,-13*b/a],mut,1.5,[8,6]);
+  }
+  if(showRef){
+    ctx.strokeStyle=fg;ctx.globalAlpha=.55;ctx.lineWidth=2*K;ctx.setLineDash([10,7]);
+    for(const sg of[1,-1]){ctx.beginPath();
+      for(let v=-3;v<=3;v+=.05){const x=sg*a*Math.cosh(v),y=b*Math.sinh(v);v===-3?ctx.moveTo(X(x),Y(y)):ctx.lineTo(X(x),Y(y))}
+      ctx.stroke()}
+    ctx.setLineDash([]);ctx.globalAlpha=1;
+  }
+  // circle
+  if(showAux){ctx.beginPath();ctx.strokeStyle=col('--c1');ctx.globalAlpha=.6;ctx.lineWidth=2*K;
+  ctx.arc(X(F1[0]),Y(F1[1]),2*a*S,0,7);ctx.stroke();ctx.globalAlpha=1;}
+  // trace
+  ctx.strokeStyle=col('--tr');ctx.lineWidth=2*K;ctx.lineJoin='round';
+  for(const tr of trace){ctx.beginPath();let pen=false;
+    for(const p of tr){if(!p){pen=false;continue}
+      pen?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1]));pen=true}
+    ctx.stroke()}
+  // construction
+  const L=30;
+  if(showAux){
+  line([F1[0]-L*u[0],F1[1]-L*u[1]],[F1[0]+L*u[0],F1[1]+L*u[1]],col('--c1'),1.5,[4,5]);
+  const n=[-d[1],d[0]],nl=Math.hypot(n[0],n[1])||1;
+  line([M[0]-L*n[0]/nl,M[1]-L*n[1]/nl],[M[0]+L*n[0]/nl,M[1]+L*n[1]/nl],col('--c2'),1.8);
+  line(A,F2,mut,1.5,[3,4]);
+  }
+  if(P){line(P,F1,col('--c3'),3);line(P,F2,col('--c4'),3)}
+  pt(F1,fg,'F₁',-30,26);pt(F2,fg,'F₂',8,26);
+  if(showAux)pt(A,col('--c1'),'A');
+  if(P)pt(P,col('--tr'),'P',10,-12);
+  // info
+  if(P){
+    const d1=Math.hypot(P[0]-F1[0],P[1]-F1[1]),d2=Math.hypot(P[0]-F2[0],P[1]-F2[1]);
+    $('d1').textContent=d1.toFixed(3);$('d2').textContent=d2.toFixed(3);
+    $('df').textContent=Math.abs(d1-d2).toFixed(3);$('d2a').textContent=(2*a).toFixed(3);
+  }
+  $('eq').textContent='标准方程：x²/'+(a*a).toFixed(2)+' − y²/'+(b*b).toFixed(2)+' = 1，离心率 e = c/a = '+(c/a).toFixed(3);
+}
+function setVals(){
+  c=Math.max(c,a+0.3);$('c').value=c;
+  $('av').textContent=a.toFixed(1);$('cv2').textContent=c.toFixed(1);
+  $('sv').textContent=speed.toFixed(1);$('tv').textContent=Math.round(t)+'°';$('t').value=t;
+}
+function loop(){
+  if(playing){
+    const steps=Math.max(1,Math.round(speed*3));
+    for(let i=0;i<steps;i++){t=(t+0.25)%360;addTrace(compute().P)}
+    setVals();
+  }
+  draw();requestAnimationFrame(loop);
+}
+$('a').oninput=e=>{a=+e.target.value;trace=[[],[]];setVals()};
+$('c').oninput=e=>{c=+e.target.value;trace=[[],[]];setVals()};
+$('sp').oninput=e=>{speed=+e.target.value;setVals()};
+$('t').oninput=e=>{t=+e.target.value;addTrace(compute().P);setVals()};
+$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'暂停':'播放'};
+$('clr').onclick=()=>{trace=[[],[]]};
+$('ref').onclick=()=>{showRef=!showRef;$('ref').textContent=showRef?'隐藏标准双曲线':'显示标准双曲线'};
+$('asy').onclick=()=>{showAsy=!showAsy;$('asy').textContent=showAsy?'隐藏渐近线':'显示渐近线'};
+$('aux').onclick=()=>{showAux=!showAux;$('aux').textContent=showAux?'隐藏辅助线':'显示辅助线'};
+setVals();loop();
+</script>
+</body>
+</html>
